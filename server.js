@@ -16,9 +16,9 @@ app.use(cors({
 app.use('/user', userRoute)
 //http://localhost:8000/user/register
 
-app.get('/', (req, res) => {
-    return res.send('Hello World');
-})
+app.get("/", (req, res) => {
+  res.send("NoticeBot Backend is Running 🚀");
+});
 
 app.listen(PORT, () => {
     connectDB();
