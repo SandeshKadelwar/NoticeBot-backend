@@ -11,6 +11,7 @@ app.use(express.json());
 app.use(cors({
     origin: `${process.env.FRONTEND_URL}`,
     credentials: true
+
 }))
 
 app.use('/user', userRoute)
@@ -20,7 +21,7 @@ app.get("/", (req, res) => {
   res.send("NoticeBot Backend is Running 🚀");
 });
 
-app.listen(PORT, () => {
-    connectDB();
-    console.log(`server is listening on port ${PORT}`);
-})
+connectDB();
+
+export default app;
+
