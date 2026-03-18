@@ -6,16 +6,16 @@ import { Session } from "../models/sessionModel.js";
 import { sendOtpMail } from "../emailVerify/sendOtpMail.js";
 
 export const registerUser = async (req, res) => {
-    try{
-        const {username, email, password} = req.body;
-        if(!username || !email || !password){
+    try {
+        const { username, email, password } = req.body;
+        if (!username || !email || !password) {
             return res.status(400).json({
                 success: false,
                 message: "All fields are required"
             })
         }
-        const existingUser = await User.findOne({email});
-        if(existingUser){
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
             return res.status(400).json({
                 success: false,
                 message: "User already exists"
@@ -25,15 +25,15 @@ export const registerUser = async (req, res) => {
         // Hash the password before saving (ex. sandesh123 - hjfafkduaylgidhavghdfskyrfav@$jgjhgjh@#)
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const newUser= await User.create({
-            username, 
+        const newUser = await User.create({
+            username,
             email,
             password: hashedPassword
         })
-    
-        const token = jwt.sign({id: newUser._id}, process.env.SECRET_KEY, {expiresIn: '10m'})
+
+        const token = jwt.sign({ id: newUser._id }, process.env.SECRET_KEY, { expiresIn: '10m' })
         verifyMail(token, email);
-        newUser.token= token;
+        newUser.token = token;
         await newUser.save();
 
         return res.status(201).json({
@@ -42,7 +42,7 @@ export const registerUser = async (req, res) => {
             data: newUser
         })
 
-    } catch(error){
+    } catch (error) {
         return res.status(500).json({
             success: false,
             message: error.message
@@ -50,10 +50,10 @@ export const registerUser = async (req, res) => {
     }
 }
 
-export const verification = async (req, res)=>{
-    try{
+export const verification = async (req, res) => {
+    try {
         const authHeader = req.headers.authorization; // Bearer tokenstring 
-        if(!authHeader || !authHeader.startsWith("Bearer ")){
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
             return res.status(401).json({
                 success: false,
                 message: "Authorization token missing/invalid"
@@ -61,10 +61,10 @@ export const verification = async (req, res)=>{
         }
         const token = authHeader.split(" ")[1];
         let decoded;
-        try{
+        try {
             decoded = jwt.verify(token, process.env.SECRET_KEY)
-        }catch(err){
-            if(err.name === 'TokenExpiredError'){
+        } catch (err) {
+            if (err.name === 'TokenExpiredError') {
                 return res.status(401).json({
                     success: false,
                     message: "The registration token/link has expired. Please register again."
@@ -73,25 +73,25 @@ export const verification = async (req, res)=>{
             return res.status(401).json({
                 success: false,
                 message: "Token verification failed"
-            }) 
-            
+            })
+
         }
         const user = await User.findById(decoded.id);
-        if(!user){
+        if (!user) {
             return res.status(404).json({
                 success: false,
                 message: "User not found",
             })
         }
-        user.token= null;
-        user.isVerified= true;
+        user.token = null;
+        user.isVerified = true;
         await user.save();
 
         return res.status(200).json({
             success: true,
             message: "Email verified successfully",
         })
-    }catch(error){
+    } catch (error) {
         return res.status(500).json({
             success: false,
             message: error.message
@@ -99,80 +99,49 @@ export const verification = async (req, res)=>{
     }
 }
 
-export const loginUser= async (req, res)=>{
-    try{
-        const {email, password}= req.body;
-        if(!email || !password){
-            return res.status(400).json({
-                success: false,
-                message: "All fields are required"
-            })
-        }
-        const user = await User.findOne({email});
-        if(!user){
-            return res.status(401).json({
-                success: false,
-                message: "User not found" 
-            })
-        }
-        
-        const passwordCheck = await bcrypt.compare(password, user.password);
-        if(!passwordCheck){
-            return res.status(402).json({
-                success: false,
-                message: "Invalid password"
-            })
-        }
-        //check if user is verified
-        if(user.isVerified !== true){
-            return res.status(403).json({
-                success: false,
-                message: "User is not verified. Please verify your email to login."
-            })
+export const loginUser = async (req, res) => {
+    try {
+        console.log("Login API hit");
+
+        const { email, password } = req.body;
+        console.log(email, password);
+
+        const user = await User.findOne({ email });
+        console.log("User:", user);
+
+        if (!user) {
+            return res.json({ success: false, message: "User not found" });
         }
 
-        //check for existing session and delete it 
-        const existingSession = await Session.findOne({userId: user._id});
-        if(existingSession){
-            await Session.deleteOne({userId: user._id});
+        const isMatch = await bcrypt.compare(password, user.password);
+        console.log("Password Match:", isMatch);
+
+        if (!isMatch) {
+            return res.json({ success: false, message: "Invalid credentials" });
         }
 
-        // create new session
-        await Session.create({userId: user._id});
+        const token = jwt.sign({ id: user._id }, process.env.SECRET_KEY);
+        console.log("Token created");
 
-        //generate jwt token
-        const accessToken = jwt.sign({id: user._id}, process.env.SECRET_KEY, {expiresIn: '10d'});
-        const refreshToken = jwt.sign({id: user._id}, process.env.SECRET_KEY, {expiresIn: '30d'});
+        res.json({ success: true, token });
 
-        user.isLoggedIn= true;
-        await user.save();
-
-        return res.status(200).json({
-            success: true,
-            message: `Welcome back, ${user.username}`,
-            accessToken,
-            refreshToken,
-            user
-        })
-    }catch(error){
-        return res.status(500).json({
-            success: false,
-            message: error.message
-        })
+    } catch (error) {
+        console.log("ERROR:", error);   // 🔥 IMPORTANT
+        res.status(500).json({ message: error.message });
     }
 }
 
-export const logoutUser= async (req, res)=>{
-    try{
+export const logoutUser = async (req, res) => {
+    try {
         const userId = req.userId;
-        await Session.deleteMany({userId});
-        await User.findByIdAndUpdate(userId, {isLoggedIn: false});
+        await Session.deleteMany({ userId });
+        await User.findByIdAndUpdate(userId, { isLoggedIn: false });
         return res.status(200).json({
             success: true,
             message: "Logged out successfully"
         })
     }
-    catch(error){
+    catch (error) {
         return res.status(500).json({
             success: false,
             message: error.message
@@ -180,22 +149,22 @@ export const logoutUser= async (req, res)=>{
     }
 }
 
-export const forgotPassword = async (req, res)=>{
+export const forgotPassword = async (req, res) => {
     try {
-        const {email}= req.body;
-        const user= await User.findOne({email});
+        const { email } = req.body;
+        const user = await User.findOne({ email });
 
-        if(!user){
+        if (!user) {
             return res.status(404).json({
                 success: false,
                 message: "User not found"
             })
         }
-        const otp= Math.floor(100000 + Math.random()*900000).toString(); // Generate a 7-digit OTP
-        const expiry = new Date(Date.now()+ 10*60*1000); // 10 minutes from now
+        const otp = Math.floor(100000 + Math.random() * 900000).toString(); // Generate a 7-digit OTP
+        const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
 
-        user.otp= otp;
-        user.otpExpiry= expiry;
+        user.otp = otp;
+        user.otpExpiry = expiry;
         await user.save();
 
         await sendOtpMail(email, otp);
@@ -211,37 +180,37 @@ export const forgotPassword = async (req, res)=>{
     }
 }
 
-export const verifyOtp = async(req, res)=>{
-    const {otp} = req.body;
+export const verifyOtp = async (req, res) => {
+    const { otp } = req.body;
     const email = req.params.email;
 
-    if(!otp){
+    if (!otp) {
         return res.status(400).json({
             success: false,
             message: "OTP is required"
         })
     }
     try {
-        const user = await User.findOne({email});
-        if(!user){
+        const user = await User.findOne({ email });
+        if (!user) {
             return res.status(404).json({
                 success: false,
                 message: "User not found"
             })
         }
-        if(!user.otp || !user.otpExpiry){
+        if (!user.otp || !user.otpExpiry) {
             return res.status(400).json({
                 success: false,
                 message: "No OTP requested. Please request a new OTP."
             })
         }
-        if(user.otpExpiry< new Date()){
+        if (user.otpExpiry < new Date()) {
             return res.status(400).json({
                 success: false,
                 message: "OTP has expired. Please request a new OTP."
             })
         }
-        if(user.otp !== otp){
+        if (user.otp !== otp) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid OTP. Please try again."
@@ -264,34 +233,34 @@ export const verifyOtp = async(req, res)=>{
     }
 }
 
-export const changePassword = async(req, res)=>{
-    const {newPassword, confirmPassword} = req.body;
+export const changePassword = async (req, res) => {
+    const { newPassword, confirmPassword } = req.body;
     const email = req.params.email;
 
-    if(!newPassword || !confirmPassword){
+    if (!newPassword || !confirmPassword) {
         return res.status(400).json({
             success: false,
             message: "All fields are required"
         })
     }
 
-    if(newPassword !== confirmPassword){
+    if (newPassword !== confirmPassword) {
         return res.status(400).json({
             success: false,
             message: "Passwords do not match"
         })
     }
     try {
-        const user = await User.findOne({email});
+        const user = await User.findOne({ email });
 
-        if(!user){
+        if (!user) {
             return res.status(404).json({
                 success: false,
                 message: "User not found"
             })
         }
-        const hashedPassword= await bcrypt.hash(newPassword, 10);
-        user.password= hashedPassword;
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password = hashedPassword;
         await user.save();
 
         return res.status(200).json({
@@ -299,7 +268,7 @@ export const changePassword = async(req, res)=>{
             message: "Password changed successfully"
         })
 
-        
+
     } catch (error) {
         return res.status(500).json({
             success: false,
