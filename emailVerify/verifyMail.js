@@ -10,33 +10,36 @@ const __dirname = path.dirname(__filename);
 
 export const verifyMail = async (token, email) => {
 
-    const emailTemplateSource = fs.readFileSync(
-        path.join(__dirname, 'template.hbs'),
-        'utf8'
-    );
-    const template = handlebars.compile(emailTemplateSource);
-    const htmlToSend = template({ token: encodeURIComponent(token) })
+    try {
+        const emailTemplateSource = fs.readFileSync(
+            path.join(__dirname, 'template.hbs'),
+            'utf8'
+        );
 
-    const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            user: process.env.MAIL_USER,
-            pass: process.env.MAIL_PASS
-        }
-    })
+        const template = handlebars.compile(emailTemplateSource);
+        const htmlToSend = template({ token: encodeURIComponent(token) });
 
-    const mailConfigurations = {
-        from: process.env.MAIL_USER,
-        to: email,
-        subject: "Email Verification",
-        html: htmlToSend
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.MAIL_USER,
+                pass: process.env.MAIL_PASS
+            }
+        });
+
+        const mailConfigurations = {
+            from: process.env.MAIL_USER,
+            to: email,
+            subject: "Email Verification",
+            html: htmlToSend
+        };
+
+        // ✅ IMPORTANT FIX
+        const info = await transporter.sendMail(mailConfigurations);
+
+        console.log("Email sent successfully:", info.response);
+
+    } catch (error) {
+        console.log("EMAIL ERROR:", error.message); // ✅ Don't throw
     }
-
-    transporter.sendMail(mailConfigurations, function (error, info) {
-        if (error) {
-            throw new Error(error);
-        }
-        console.log('Email sent successfully');
-        console.log(info);
-    })
-}
+};
